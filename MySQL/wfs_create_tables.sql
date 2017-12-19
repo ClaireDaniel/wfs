@@ -1,3 +1,52 @@
+-- Control categorical variable tables
+
+-- Gender
+CREATE TABLE gender_categories(
+	gender_code VARCHAR(1),
+    gender_label VARCHAR(6)
+);
+
+INSERT INTO gender_categories VALUES ('M', 'Male');
+INSERT INTO gender_categories VALUES ('F', 'Female');
+
+-- Age division
+CREATE TABLE age_division_categories(
+	age_div_code VARCHAR(3),
+    age_div_label VARCHAR(1)
+);
+
+INSERT INTO age_division_categories VALUES ('C', 'Cadet');
+INSERT INTO age_division_categories VALUES ('J', 'Junior');
+INSERT INTO age_division_categories VALUES ('U23', 'Under 23');
+INSERT INTO age_division_categories VALUES ('S', 'Senior');
+INSERT INTO age_division_categories VALUES ('V', 'Veteran');
+
+-- Comp type
+CREATE TABLE comp_type_categories(
+	comp_type_code VARCHAR(3),
+    comp_type_label VARCHAR (25)
+);
+
+INSERT INTO comp_type_categories VALUES ('NF', 'Non official');
+INSERT INTO comp_type_categories VALUES ('CHZ', 'Zone Championships' );
+INSERT INTO comp_type_categories VALUES ('GP', 'Grand Prix');
+INSERT INTO comp_type_categories VALUES ('SA', 'Sattelite');
+INSERT INTO comp_type_categories VALUES ('CHM', 'World CHampionships');
+INSERT INTO comp_type_categories VALUES ('A', 'World Cup');
+INSERT INTO comp_type_categories VALUES ('JO', 'Olympic Games');
+INSERT INTO comp_type_categories VALUES ('OF', 'Official');
+
+-- Weapon type
+CREATE TABLE weapon_categories(
+	weapon_code VARCHAR(1),
+    weapon_label VARCHAR(5)
+);
+
+INSERT INTO weapon_categories VALUES ('F', 'Foil');
+INSERT INTO weapon_categories VALUES ('S', 'Sabre');
+INSERT INTO weapon_categories VALUES ('E', 'Epee');
+
+
 -- Fencer table
 DROP TABLE fencer;
 
@@ -11,11 +60,12 @@ CREATE TABLE fencer (
     birth_date DATE, 
     ranking_current INT, 
     hand VARCHAR (5), 
-    foil VARCHAR (4), 
-    sabre VARCHAR (4), 
-    epee VARCHAR (4), 
-    gender_api VARCHAR(7),
-    PRIMARY KEY (fencer_number));
+    foil BOOL, 
+    sabre BOOL, 
+    epee BOOL, 
+    gender_api VARCHAR(1),
+    PRIMARY KEY (fencer_number),
+    FOREIGN KEY (gender_api) REFERENCES gender_categories(gender_code));
     
 LOAD DATA LOCAL infile 'C:/Users/cdaniel/fie-fencing-data/Updates/fencer_df_update_171216.csv'
 	INTO TABLE fencer
@@ -40,16 +90,17 @@ select * from fencer limit 10;
 DROP TABLE ranking;
 
 CREATE TABLE ranking(
+	ranking_id INT,
 	fencer_number BIGINT,
-	first_name VARCHAR (50),
-	last_name VARCHAR (50),
 	rank_type VARCHAR (7),
 	rank_season	VARCHAR (9),
     rank_position INT,
     rank_points INT,	
     season_age INT,
 	fencer_age_division VARCHAR(7),
-    FOREIGN KEY (fencer_number) REFERENCES fencer(fencer_number)
+    FOREIGN KEY (fencer_number) REFERENCES fencer(fencer_number),
+    FOREIGN KEY (rank_type) REFERENCES age_division_categories(age_div_code),
+    FOREIGN KEY (fencer_age_division) REFERENCES age_division_categories(age_div_code)
 );
 
 LOAD DATA LOCAL infile 'C:/Users/cdaniel/fie-fencing-data/Updates/rank_df_update_171216.csv'
@@ -63,9 +114,8 @@ SELECT * FROM ranking LIMIT 10;
 DROP TABLE results;
 
 CREATE TABLE results (
+	results_id INT,
 	fencer_number BIGINT,
-    first_name VARCHAR (50),
-    last_name VARCHAR (50),
     results_date DATE,
     results_type VARCHAR (50),
     results_place VARCHAR (50),
@@ -77,14 +127,19 @@ CREATE TABLE results (
     comp_type VARCHAR(5),	
     comp_level VARCHAR (1),
     comp_weapon VARCHAR (1),
-    FOREIGN KEY (fencer_number) REFERENCES fencer(fencer_number)
+    FOREIGN KEY (fencer_number) REFERENCES fencer(fencer_number),
+    FOREIGN KEY (results_type) REFERENCES comp_type_categories(comp_type_label),
+    FOREIGN KEY (fencer_age_division) REFERENCES age_division_categories(age_div_code),
+    FOREIGN KEY (comp_type) REFERENCES  comp_type_categories(comp_type_code),
+    FOREIGN KEY (comp_level) REFERENCES age_division_categories(age_div_code),
+    FOREIGN KEY (comp_weapon) REFERENCES weapon_categories(weapon_code)
 );
 
 LOAD DATA LOCAL infile 'C:/Users/cdaniel/fie-fencing-data/Updates/results_df_update_171216.csv'
 	INTO TABLE results
 	fields terminated BY ","
 	lines terminated BY "\r\n"
-    (fencer_number, first_name, last_name, results_date,
+    (results_id, fencer_number, results_date,
      results_type, results_place, city, country, results_rank,
      @age, @fencer_age_division, comp_type, comp_level, comp_weapon) 
        SET age = IF(@age = '', NULL, @age), 
@@ -97,10 +152,8 @@ SELECT * FROM results LIMIT 10;
 DROP TABLE opponents;
 
 CREATE TABLE opponents (
+	opponents_id INT,
 	fencer_number BIGINT,
-    first_name VARCHAR(50),
-    last_name VARCHAR(50),
-    opponent_name VARCHAR(50),
     opponent_number BIGINT,
     opponent_country VARCHAR (50),
     victories INT,
@@ -121,27 +174,28 @@ SELECT * FROM opponents LIMIT 10;
 DROP TABLE bouts;
 
 CREATE TABLE bouts (
+	bouts_id INT,
 	fencer_number BIGINT,
-    first_name VARCHAR(50),
-    last_name VARCHAR(50),
     city VARCHAR(50),
     comp_date DATE,
     comp_type VARCHAR(5),
     comp_level VARCHAR(1),
     comp_weapon VARCHAR(1),
-    opponent_name VARCHAR(50),
     opponent_number BIGINT,
     fencer_score INT,
     opponent_score INT,
     FOREIGN KEY (fencer_number) REFERENCES fencer(fencer_number),
-    FOREIGN KEY (opponent_number) REFERENCES fencer(fencer_number)
+    FOREIGN KEY (opponent_number) REFERENCES fencer(fencer_number),
+	FOREIGN KEY (comp_type) REFERENCES  comp_type_categories(comp_type_code),
+    FOREIGN KEY (comp_level) REFERENCES age_division_categories(age_div_code),
+    FOREIGN KEY (comp_weapon) REFERENCES weapon_categories(weapon_code)
 );
 
 LOAD DATA LOCAL infile 'C:/Users/cdaniel/fie-fencing-data/Updates/bouts_df_update_171216.csv'
 	INTO TABLE bouts
 	fields terminated BY ","
 	lines terminated BY "\n"
-	(fencer_number, first_name, last_name, @city,
+	(bouts_id, fencer_number, @city,
      @comp_date, @comp_type, comp_level, comp_weapon, opponent_name,
      Opponent_number, fencer_score, opponent_score) 
        SET city = IF(@city = '', NULL, @city),
